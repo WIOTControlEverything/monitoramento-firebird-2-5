@@ -5,7 +5,7 @@ const client = require('prom-client');
 const app = express();
 const register = new client.Registry();
 
-// Configurações do Banco (Pega das variaveis de ambiente ou usa padrao)
+// Configurações do Banco
 const options = {
     host: process.env.DB_HOST || '192.168.0.75',
     port: 3050,
@@ -20,26 +20,35 @@ const options = {
     encoding: 'UTF8',
 };
 
-// Definição das Métricas
+// --- DEFINIÇÃO DAS MÉTRICAS ---
+
+// 1. Métricas Globais (Contadores Simples)
 const connectionsActive = new client.Gauge({
-    name: 'firebird_connections_active',
-    help: 'Numero de conexoes ativas no momento'
+    name: 'firebird_connections_total',
+    help: 'Total de conexoes ativas no momento'
 });
 const transactionsActive = new client.Gauge({
-    name: 'firebird_transactions_active',
-    help: 'Numero de transacoes ativas'
+    name: 'firebird_transactions_total',
+    help: 'Total de transacoes ativas'
 });
 const oldestTransaction = new client.Gauge({
     name: 'firebird_oldest_transaction_seconds',
     help: 'Idade da transacao ativa mais antiga em segundos'
 });
 
-// Registra métricas no registro global
+// 2. Métrica Detalhada (Com Labels para o Grafana filtrar por IP)
+const connectionDetail = new client.Gauge({
+    name: 'firebird_connection_duration_seconds',
+    help: 'Detalhes de cada conexao ativa',
+    labelNames: ['ip', 'process', 'user', 'id'] // <--- O SEGREDO ESTÁ AQUI
+});
+
 register.registerMetric(connectionsActive);
 register.registerMetric(transactionsActive);
 register.registerMetric(oldestTransaction);
+register.registerMetric(connectionDetail);
 
-// Função para rodar Query Promisificada
+// Função auxiliar de Query
 const query = (db, sql) => {
     return new Promise((resolve, reject) => {
         db.query(sql, (err, result) => {
@@ -53,26 +62,23 @@ app.get('/metrics', async (req, res) => {
     Firebird.attach(options, async (err, db) => {
         if (err) {
             console.error("Erro ao conectar no Firebird:", err.message);
-            // Se der erro de conexão, retorna o erro ou mantém a métrica anterior
             return res.status(500).send(err.message);
         }
 
         try {
-            // 1. Conexões Ativas
+            const now = new Date();
+
+            // A. Coleta Totais (Rápido)
             const resConn = await query(db, 'SELECT count(*) as CNT FROM MON$ATTACHMENTS WHERE MON$STATE = 1');
             connectionsActive.set(resConn[0].CNT);
 
-            // 2. Transações Ativas
             const resTrans = await query(db, 'SELECT count(*) as CNT FROM MON$TRANSACTIONS WHERE MON$STATE = 1');
             transactionsActive.set(resTrans[0].CNT);
 
-            // 3. Transação Mais Antiga (Cálculo direto no Node para evitar erro de SQL no FB 2.5)
-            // Pegamos o Timestamp da transação mais antiga
+            // B. Coleta Transação Mais Antiga
             const sqlOldest = 'SELECT MIN(MON$TIMESTAMP) as OLD_TS FROM MON$TRANSACTIONS WHERE MON$STATE = 1';
             const resOldest = await query(db, sqlOldest);
-
             if (resOldest[0].OLD_TS) {
-                const now = new Date();
                 const oldest = new Date(resOldest[0].OLD_TS);
                 const diffSeconds = (now - oldest) / 1000;
                 oldestTransaction.set(diffSeconds);
@@ -80,19 +86,48 @@ app.get('/metrics', async (req, res) => {
                 oldestTransaction.set(0);
             }
 
+            // C. Coleta Detalhada por Conexão (Para tabela no Grafana)
+            // IMPORTANTE: Limpar dados anteriores para não sobrar lixo de conexões fechadas
+            connectionDetail.reset();
+
+            const sqlDetails = `
+                SELECT 
+                    MON$ATTACHMENT_ID as ID, 
+                    MON$REMOTE_ADDRESS as IP, 
+                    MON$REMOTE_PROCESS as PROC, 
+                    MON$USER as USR, 
+                    MON$TIMESTAMP as TS
+                FROM MON$ATTACHMENTS 
+                WHERE MON$STATE = 1
+            `;
+
+            const rows = await query(db, sqlDetails);
+
+            rows.forEach(row => {
+                const connStart = new Date(row.TS);
+                const duration = (now - connStart) / 1000;
+
+                // Tratamento básico para limpar lixo do IP (Firebird às vezes manda IPv4:...)
+                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').trim() : 'Internal';
+                let cleanProc = row.PROC ? row.PROC.toString().trim() : 'Unknown';
+                let cleanUser = row.USR ? row.USR.toString().trim() : 'Unknown';
+
+                // Seta o valor com as etiquetas
+                connectionDetail.labels(cleanIp, cleanProc, cleanUser, row.ID).set(duration);
+            });
+
             db.detach();
             res.set('Content-Type', register.contentType);
             res.end(await register.metrics());
 
         } catch (e) {
             console.error("Erro na query:", e);
-            db.detach();
+            if (db) db.detach();
             res.status(500).send(e.message);
         }
     });
 });
 
 app.listen(9399, () => {
-    console.log('Exporter rodando na porta 9399');
-    console.log(`Alvo: ${options.host}:${options.database}`);
+    console.log('Exporter Atualizado rodando na porta 9399');
 });
