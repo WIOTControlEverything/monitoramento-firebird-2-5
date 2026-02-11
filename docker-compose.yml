@@ -9,7 +9,7 @@ services:
       - DB_USER=SYSDBA
       - DB_PASSWORD=masterkey
     ports:
-      - "9399:9399"
+      - 9399:9399
     restart: always
 
   # 2. O Banco de Dados de Séries Temporais (Guarda o histórico)
@@ -21,8 +21,8 @@ services:
       - prometheus_data:/prometheus
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-    expose:
-      - 9090
+    ports:
+      - 29090:9090
     networks:
       - wpanel
     command:
