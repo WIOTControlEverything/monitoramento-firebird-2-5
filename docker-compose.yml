@@ -7,6 +7,8 @@ services:
       - ./sql_exporter/sql_exporter.yml:/config/sql_exporter.yml
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
+    command:
+      - '-config.file=/config/sql_exporter.yml'
     expose:
       - 9399
     networks:
