@@ -29,7 +29,8 @@ services:
       - wpanel
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=15d'
+      - '--storage.tsdb.retention.time=115d'
+      - '--web.cors.origin=.*'
     restart: always
 
   # 3. A Interface Visual
