@@ -22,7 +22,7 @@ const options = {
 
 // --- DEFINIÇÃO DAS MÉTRICAS ---
 
-// 1. Métricas Globais (Contadores Simples)
+// 1. Totais
 const connectionsActive = new client.Gauge({
     name: 'firebird_connections_total',
     help: 'Total de conexoes ativas no momento'
@@ -36,17 +36,31 @@ const oldestTransaction = new client.Gauge({
     help: 'Idade da transacao ativa mais antiga em segundos'
 });
 
-// 2. Métrica Detalhada (Com Labels para o Grafana filtrar por IP)
+// 2. Detalhe da Conexão (Tempo Online)
 const connectionDetail = new client.Gauge({
     name: 'firebird_connection_duration_seconds',
     help: 'Detalhes de cada conexao ativa',
-    labelNames: ['ip', 'process', 'user', 'id'] // <--- O SEGREDO ESTÁ AQUI
+    labelNames: ['ip', 'process', 'user', 'id']
+});
+
+// 3. Detalhe das Queries (NOVAS MÉTRICAS)
+const statementSeqReads = new client.Gauge({
+    name: 'firebird_statement_seq_reads',
+    help: 'Leituras sequenciais (Full Scan) da query atual - ALERTA DE LENTIDAO',
+    labelNames: ['ip', 'sql_text', 'id']
+});
+const statementIdxReads = new client.Gauge({
+    name: 'firebird_statement_idx_reads',
+    help: 'Leituras via indice da query atual',
+    labelNames: ['ip', 'sql_text', 'id']
 });
 
 register.registerMetric(connectionsActive);
 register.registerMetric(transactionsActive);
 register.registerMetric(oldestTransaction);
 register.registerMetric(connectionDetail);
+register.registerMetric(statementSeqReads);
+register.registerMetric(statementIdxReads);
 
 // Função auxiliar de Query
 const query = (db, sql) => {
@@ -68,14 +82,14 @@ app.get('/metrics', async (req, res) => {
         try {
             const now = new Date();
 
-            // A. Coleta Totais (Rápido)
+            // A. Coleta Totais
             const resConn = await query(db, 'SELECT count(*) as CNT FROM MON$ATTACHMENTS WHERE MON$STATE = 1');
             connectionsActive.set(resConn[0].CNT);
 
             const resTrans = await query(db, 'SELECT count(*) as CNT FROM MON$TRANSACTIONS WHERE MON$STATE = 1');
             transactionsActive.set(resTrans[0].CNT);
 
-            // B. Coleta Transação Mais Antiga
+            // B. Transação Mais Antiga
             const sqlOldest = 'SELECT MIN(MON$TIMESTAMP) as OLD_TS FROM MON$TRANSACTIONS WHERE MON$STATE = 1';
             const resOldest = await query(db, sqlOldest);
             if (resOldest[0].OLD_TS) {
@@ -86,34 +100,49 @@ app.get('/metrics', async (req, res) => {
                 oldestTransaction.set(0);
             }
 
-            // C. Coleta Detalhada por Conexão (Para tabela no Grafana)
-            // IMPORTANTE: Limpar dados anteriores para não sobrar lixo de conexões fechadas
+            // C. Detalhes de Conexão (Reset antes de preencher)
             connectionDetail.reset();
-
-            const sqlDetails = `
-                SELECT 
-                    MON$ATTACHMENT_ID as ID, 
-                    MON$REMOTE_ADDRESS as IP, 
-                    MON$REMOTE_PROCESS as PROC, 
-                    MON$USER as USR, 
-                    MON$TIMESTAMP as TS
-                FROM MON$ATTACHMENTS 
-                WHERE MON$STATE = 1
+            const sqlConnDetails = `
+                SELECT MON$ATTACHMENT_ID as ID, MON$REMOTE_ADDRESS as IP, MON$REMOTE_PROCESS as PROC, MON$USER as USR, MON$TIMESTAMP as TS
+                FROM MON$ATTACHMENTS WHERE MON$STATE = 1
             `;
-
-            const rows = await query(db, sqlDetails);
-
-            rows.forEach(row => {
+            const rowsConn = await query(db, sqlConnDetails);
+            rowsConn.forEach(row => {
                 const connStart = new Date(row.TS);
                 const duration = (now - connStart) / 1000;
-
-                // Tratamento básico para limpar lixo do IP (Firebird às vezes manda IPv4:...)
                 let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').trim() : 'Internal';
                 let cleanProc = row.PROC ? row.PROC.toString().trim() : 'Unknown';
                 let cleanUser = row.USR ? row.USR.toString().trim() : 'Unknown';
-
-                // Seta o valor com as etiquetas
                 connectionDetail.labels(cleanIp, cleanProc, cleanUser, row.ID).set(duration);
+            });
+
+            // D. Queries Executando AGORA (Reset antes de preencher)
+            statementSeqReads.reset();
+            statementIdxReads.reset();
+
+            const sqlStatements = `
+                SELECT
+                    S.MON$ATTACHMENT_ID as ID,
+                    SUBSTRING(S.MON$SQL_TEXT FROM 1 FOR 255) as SQL_TEXT,
+                    R.MON$RECORD_SEQ_READS as SEQ_READS,
+                    R.MON$RECORD_IDX_READS as IDX_READS,
+                    A.MON$REMOTE_ADDRESS as IP
+                FROM
+                    MON$STATEMENTS S
+                    JOIN MON$RECORD_STATS R ON R.MON$STAT_ID = S.MON$STAT_ID
+                    JOIN MON$ATTACHMENTS A ON A.MON$ATTACHMENT_ID = S.MON$ATTACHMENT_ID
+                WHERE
+                    S.MON$STATE = 1
+            `;
+
+            const rowsStmt = await query(db, sqlStatements);
+
+            rowsStmt.forEach(row => {
+                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').trim() : 'Internal';
+                let cleanSql = row.SQL_TEXT ? row.SQL_TEXT.toString().trim().replace(/\s+/g, ' ') : 'Empty'; // Remove quebras de linha
+
+                statementSeqReads.labels(cleanIp, cleanSql, row.ID).set(row.SEQ_READS);
+                statementIdxReads.labels(cleanIp, cleanSql, row.ID).set(row.IDX_READS);
             });
 
             db.detach();
@@ -129,5 +158,5 @@ app.get('/metrics', async (req, res) => {
 });
 
 app.listen(9399, () => {
-    console.log('Exporter Atualizado rodando na porta 9399');
+    console.log('Exporter Full rodando na porta 9399');
 });
