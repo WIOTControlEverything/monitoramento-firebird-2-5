@@ -9,7 +9,9 @@ services:
       - DB_USER=SYSDBA
       - DB_PASSWORD=masterkey
     ports:
-      - 9399:9399
+      - 29399:9399
+    networks:
+      - wpanel
     restart: always
 
   # 2. O Banco de Dados de Séries Temporais (Guarda o histórico)
