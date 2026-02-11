@@ -1,0 +1,45 @@
+global:
+  scrape_timeout: 10s
+
+target:
+  data_source_name: 'firebird://SYSDBA:masterkey@192.168.0.75:3050//firebird/data/latitude.fdb'
+
+collectors:
+  - collector_name: firebird_metrics
+    metrics:
+      - metric_name: firebird_connections_active
+        type: gauge
+        help: 'Numero de conexoes ativas no momento'
+        values: [count]
+        query: |
+          SELECT count(*) as count FROM MON$ATTACHMENTS WHERE MON$STATE = 1
+
+      - metric_name: firebird_transactions_active
+        type: gauge
+        help: 'Numero de transacoes ativas (pendentes de commit)'
+        values: [count]
+        query: |
+          SELECT count(*) as count FROM MON$TRANSACTIONS WHERE MON$STATE = 1
+
+      - metric_name: firebird_oldest_transaction_seconds
+        type: gauge
+        help: 'Idade da transacao ativa mais antiga em segundos (Gargalo de Garbage Collection)'
+        values: [seconds]
+        query: |
+          SELECT COALESCE(MAX(CAST((CURRENT_TIMESTAMP - T.MON$TIMESTAMP) * 86400 AS INTEGER)), 0) as seconds
+          FROM MON$TRANSACTIONS T
+          WHERE T.MON$STATE = 1
+
+      - metric_name: firebird_memory_used
+        type: gauge
+        help: 'Memoria usada pelo banco em bytes'
+        values: [bytes]
+        query: |
+          SELECT MON$MEMORY_USED as bytes FROM MON$DATABASE
+
+      - metric_name: firebird_io_reads
+        type: counter
+        help: 'Leituras de pagina em disco'
+        values: [reads]
+        query: |
+          SELECT sum(MON$PAGE_READS) as reads FROM MON$IO_STATS
