@@ -1,7 +1,7 @@
 services:
   # 1. O Coletor de Métricas (Roda as queries no Firebird)
   sql-exporter:
-    image: burningalchemist/sql_exporter:latest
+    image: ccsplit/sql_exporter:latest
     container_name: firebird_exporter
     volumes:
       - ./sql_exporter/sql_exporter.yml:/config/sql_exporter.yml
