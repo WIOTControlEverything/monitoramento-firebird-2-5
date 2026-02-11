@@ -1,8 +1,10 @@
 global:
   scrape_timeout: 10s
 
-target:
-  data_source_name: 'firebird://SYSDBA:masterkey@192.168.0.75:3050//firebird/data/latitude.fdb'
+jobs:
+  - name: 'firebird_prod'
+    db_connection: 'firebird://SYSDBA:masterkey@192.168.0.75:3050//firebird/data/latitude.fdb'
+    collectors: ['firebird_metrics']
 
 collectors:
   - collector_name: firebird_metrics
