@@ -1,18 +1,15 @@
 services:
   # 1. O Coletor de Métricas (Roda as queries no Firebird)
   sql-exporter:
-    image: ccsplit/sql_exporter:latest
+    build: ./custom_exporter
     container_name: firebird_exporter
-    volumes:
-      - ./sql_exporter/sql_exporter.yml:/config/sql_exporter.yml
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
-    command:
-      - '-config.file=/config/sql_exporter.yml'
-    expose:
-      - 9399
-    networks:
-      - wpanel
+    environment:
+      - DB_HOST=192.168.0.75
+      - DB_PATH=/firebird/data/latitude.fdb
+      - DB_USER=SYSDBA
+      - DB_PASSWORD=masterkey
+    ports:
+      - "9399:9399"
     restart: always
 
   # 2. O Banco de Dados de Séries Temporais (Guarda o histórico)
