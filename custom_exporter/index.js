@@ -110,8 +110,7 @@ app.get('/metrics', async (req, res) => {
             rowsConn.forEach(row => {
                 const connStart = new Date(row.TS);
                 const duration = (now - connStart) / 1000;
-                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').trim() : 'Internal';
-                let cleanProc = row.PROC ? row.PROC.toString().trim() : 'Unknown';
+                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').split('/')[0].trim() : 'Internal';                let cleanProc = row.PROC ? row.PROC.toString().trim() : 'Unknown';
                 let cleanUser = row.USR ? row.USR.toString().trim() : 'Unknown';
                 connectionDetail.labels(cleanIp, cleanProc, cleanUser, row.ID).set(duration);
             });
@@ -138,8 +137,7 @@ app.get('/metrics', async (req, res) => {
             const rowsStmt = await query(db, sqlStatements);
 
             rowsStmt.forEach(row => {
-                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').trim() : 'Internal';
-                let cleanSql = row.SQL_TEXT ? row.SQL_TEXT.toString().trim().replace(/\s+/g, ' ') : 'Empty'; // Remove quebras de linha
+                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').split('/')[0].trim() : 'Internal';                let cleanSql = row.SQL_TEXT ? row.SQL_TEXT.toString().trim().replace(/\s+/g, ' ') : 'Empty'; // Remove quebras de linha
 
                 statementSeqReads.labels(cleanIp, cleanSql, row.ID).set(row.SEQ_READS);
                 statementIdxReads.labels(cleanIp, cleanSql, row.ID).set(row.IDX_READS);
