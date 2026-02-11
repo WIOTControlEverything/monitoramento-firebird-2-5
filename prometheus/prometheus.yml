@@ -6,7 +6,7 @@ scrape_configs:
   # Job 1: Monitora o Banco de Dados (SQL)
   - job_name: 'firebird_monitoring'
     static_configs:
-      - targets: ['sql-exporter:9399']
+      - targets: ['firebird_exporter:9399']
 
   # Job 2: Monitora a VM (CPU/Memória/Disco) - NOVO
   - job_name: 'firebird_vm'
