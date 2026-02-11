@@ -29,7 +29,7 @@ services:
       - wpanel
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=115d'
+      - '--storage.tsdb.retention.time=365d'
       - '--web.cors.origin=.*'
     restart: always
 
