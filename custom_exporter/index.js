@@ -9,12 +9,15 @@ const register = new client.Registry();
 const options = {
     host: process.env.DB_HOST || '192.168.0.75',
     port: 3050,
-    database: process.env.DB_PATH || '/firebird/data/latitude.fdb',
+    database: process.env.DB_PATH || '/home/latitude/firebird/data/latitude.fdb',
     user: process.env.DB_USER || 'SYSDBA',
     password: process.env.DB_PASSWORD || 'masterkey',
     lowercase_keys: false,
     role: null,
-    pageSize: 4096
+    pageSize: 4096,
+    retryConnectionInterval: 1000,
+    blobAsText: true,
+    encoding: 'UTF8',
 };
 
 // Definição das Métricas

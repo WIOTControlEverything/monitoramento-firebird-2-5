@@ -5,7 +5,7 @@ services:
     container_name: firebird_exporter
     environment:
       - DB_HOST=192.168.0.75
-      - DB_PATH=/firebird/data/latitude.fdb
+      - DB_PATH=/home/latitude/firebird/data/latitude.fdb
       - DB_USER=SYSDBA
       - DB_PASSWORD=masterkey
     ports:
