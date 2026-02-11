@@ -47,7 +47,10 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin # Troque a senha aqui
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_DOMAIN=fsg-grafana.wpanel.ind.br
+      - GF_SERVER_ROOT_URL=https://fsg-grafana.wpanel.ind.br/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
     depends_on:
       - prometheus
     restart: always
