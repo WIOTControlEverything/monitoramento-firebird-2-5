@@ -17,3 +17,8 @@ scrape_configs:
   - job_name: 'wpanel_vm'
     static_configs:
       - targets: [ '192.168.0.17:9100' ]
+
+  # Job 4: Monitora a VM Windows Server
+  - job_name: 'windows_server_vm_focco'
+    static_configs:
+      - targets: [ '192.168.0.101:9182' ]
