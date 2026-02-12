@@ -98,6 +98,11 @@ const dbSweepInterval = new client.Gauge({
     help: 'Intervalo de Sweep automatico configurado'
 });
 
+const dbPageBuffers = new client.Gauge({
+    name: 'firebird_db_page_buffers',
+    help: 'Numero de paginas mantidas em cache (Buffers)'
+});
+
 register.registerMetric(connectionsActive);
 register.registerMetric(transactionsActive);
 register.registerMetric(oldestTransaction);
@@ -111,6 +116,7 @@ register.registerMetric(dbInfo);
 register.registerMetric(dbPageSize);
 register.registerMetric(dbForcedWrites);
 register.registerMetric(dbSweepInterval);
+register.registerMetric(dbPageBuffers);
 
 // Função auxiliar de Query
 const query = (db, sql) => {
@@ -247,6 +253,7 @@ app.get('/metrics', async (req, res) => {
             // E. Coleta de Informações do Banco (MON$DATABASE)
             dbInfo.reset();
             dbPageSize.reset();
+            dbPageBuffers.reset();
             dbForcedWrites.reset();
             dbSweepInterval.reset();
 
@@ -254,6 +261,7 @@ app.get('/metrics', async (req, res) => {
                 SELECT 
                     M.MON$DATABASE_NAME as DB_PATH,
                     M.MON$PAGE_SIZE as PAGE_SIZE,
+                    M.MON$PAGE_BUFFERS as BUFFERS,
                     M.MON$SQL_DIALECT as DIALECT,
                     M.MON$ODS_MAJOR || '.' || M.MON$ODS_MINOR as ODS_VER,
                     M.MON$FORCED_WRITES as FW,
@@ -277,6 +285,7 @@ app.get('/metrics', async (req, res) => {
 
                 // Métricas Numéricas
                 dbPageSize.set(row.PAGE_SIZE);
+                dbPageBuffers.set(row.BUFFERS);
                 dbForcedWrites.set(row.FW);
                 dbSweepInterval.set(row.SWEEP);
             }
