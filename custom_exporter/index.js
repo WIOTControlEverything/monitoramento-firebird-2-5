@@ -50,7 +50,14 @@ const connectionTxCount = new client.Gauge({
     labelNames: ['ip', 'process', 'user', 'id']
 });
 
-// 4. Detalhe das Queries
+// 4. Lista de IDs (Hack para exibir texto no Grafana)
+const connectionTxList = new client.Gauge({
+    name: 'firebird_connection_tx_ids_info',
+    help: 'Métrica dummy usada apenas para levar a lista de IDs como label',
+    labelNames: ['id', 'tx_ids']
+});
+
+// 5. Detalhe das Queries
 const statementSeqReads = new client.Gauge({
     name: 'firebird_statement_seq_reads',
     help: 'Leituras sequenciais (Full Scan) da query atual - ALERTA DE LENTIDAO',
@@ -120,7 +127,10 @@ app.get('/metrics', async (req, res) => {
                     A.MON$REMOTE_PROCESS as PROC,
                     A.MON$USER as USR,
                     A.MON$TIMESTAMP as TS,
-                    (SELECT COUNT(*) FROM MON$TRANSACTIONS T WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_COUNT
+                    -- Conta quantas tem
+                    (SELECT COUNT(*) FROM MON$TRANSACTIONS T WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_COUNT,
+                    -- Agrupa os IDs numa string (Ex: "4500, 4501")
+                    (SELECT LIST(T.MON$TRANSACTION_ID, ', ') FROM MON$TRANSACTIONS T WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_LIST_STR
                 FROM MON$ATTACHMENTS A
                 WHERE A.MON$STATE = 1
             `;
@@ -140,6 +150,12 @@ app.get('/metrics', async (req, res) => {
 
                 // Métrica de Transações Ativas (Novo)
                 connectionTxCount.labels(cleanIp, cleanProc, cleanUser, row.ID).set(row.TX_COUNT);
+
+                // Se tiver transação, pega a lista. Se não, deixa vazio.
+                let txListString = row.TX_LIST_STR ? row.TX_LIST_STR.toString() : '-';
+
+                // O valor é 1 (dummy), o que importa é a label tx_ids
+                connectionTxList.labels(row.ID, txListString).set(1);
             });
 
             // D. Queries Executando AGORA
