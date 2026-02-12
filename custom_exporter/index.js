@@ -50,6 +50,12 @@ const connectionTxCount = new client.Gauge({
     labelNames: ['ip', 'process', 'user', 'id']
 });
 
+const connectionTxAge = new client.Gauge({
+    name: 'firebird_connection_tx_age_seconds',
+    help: 'Idade em segundos da transacao ativa mais antiga desta conexao',
+    labelNames: ['ip', 'process', 'user', 'id']
+});
+
 // 4. Lista de IDs (Hack para exibir texto no Grafana)
 const connectionTxList = new client.Gauge({
     name: 'firebird_connection_tx_ids_info',
@@ -74,6 +80,7 @@ register.registerMetric(transactionsActive);
 register.registerMetric(oldestTransaction);
 register.registerMetric(connectionDetail);
 register.registerMetric(connectionTxCount);
+register.registerMetric(connectionTxAge);
 register.registerMetric(connectionTxList);
 register.registerMetric(statementSeqReads);
 register.registerMetric(statementIdxReads);
@@ -119,6 +126,8 @@ app.get('/metrics', async (req, res) => {
             // C. Detalhes de Conexão + Contagem de Transações por Conexão
             connectionDetail.reset();
             connectionTxCount.reset();
+            connectionTxList.reset();
+            connectionTxAge.reset();
 
             // Query aprimorada: Traz os dados da conexão E conta quantas transações ela tem
             const sqlConnDetails = `
@@ -127,11 +136,22 @@ app.get('/metrics', async (req, res) => {
                     A.MON$REMOTE_ADDRESS as IP,
                     A.MON$REMOTE_PROCESS as PROC,
                     A.MON$USER as USR,
-                    A.MON$TIMESTAMP as TS,
-                    -- Conta quantas tem
-                    (SELECT COUNT(*) FROM MON$TRANSACTIONS T WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_COUNT,
-                    -- Agrupa os IDs numa string (Ex: "4500, 4501")
-                    (SELECT LIST(T.MON$TRANSACTION_ID, ', ') FROM MON$TRANSACTIONS T WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_LIST_STR
+                    A.MON$TIMESTAMP as TS, -- Hora que CONECTOU
+
+                    -- Conta quantas transações ativas tem
+                    (SELECT COUNT(*)
+                     FROM MON$TRANSACTIONS T
+                     WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_COUNT,
+
+                    -- CRUCIAL: Calcula a idade da transação mais velha em SEGUNDOS
+                    (SELECT DATEDIFF(SECOND, MIN(T.MON$TIMESTAMP), CURRENT_TIMESTAMP)
+                     FROM MON$TRANSACTIONS T
+                     WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_AGE_SEC,
+
+                    -- Lista os IDs para auditoria
+                    (SELECT LIST(T.MON$TRANSACTION_ID, ', ')
+                     FROM MON$TRANSACTIONS T
+                     WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_LIST_STR
                 FROM MON$ATTACHMENTS A
                 WHERE A.MON$STATE = 1
             `;
@@ -157,6 +177,9 @@ app.get('/metrics', async (req, res) => {
 
                 // Métrica de Transações Ativas (Novo)
                 connectionTxCount.labels(cleanIp, cleanProc, cleanUser, row.ID).set(row.TX_COUNT);
+
+                let txAge = row.TX_AGE_SEC !== null ? row.TX_AGE_SEC : 0;
+                connectionTxAge.labels(cleanIp, cleanProc, cleanUser, row.ID).set(txAge);
 
                 // Se tiver transação, pega a lista. Se não, deixa vazio.
                 let txListString = row.TX_LIST_STR ? row.TX_LIST_STR.toString() : '-';
