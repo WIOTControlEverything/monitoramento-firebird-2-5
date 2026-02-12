@@ -80,10 +80,9 @@ services:
     image: prom/mysqld-exporter
     container_name: mysqld_exporter
     environment:
-      # SINTAXE: usuario:senha@(IP_DO_BANCO:3306)/
-      - DATA_SOURCE_NAME=root:At50lcdu@@mariadb:3306/
       - TZ=America/Sao_Paulo
     volumes:
+      - ./database/my.cnf:/.my.cnf
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
     ports:
