@@ -39,11 +39,18 @@ const oldestTransaction = new client.Gauge({
 // 2. Detalhe da Conexão (Tempo Online)
 const connectionDetail = new client.Gauge({
     name: 'firebird_connection_duration_seconds',
-    help: 'Detalhes de cada conexao ativa',
+    help: 'Tempo de duracao da conexao em segundos',
     labelNames: ['ip', 'process', 'user', 'id']
 });
 
-// 3. Detalhe das Queries (NOVAS MÉTRICAS)
+// 3. Detalhe da Conexão (Quantidade de Transações) -- NOVA METRICA --
+const connectionTxCount = new client.Gauge({
+    name: 'firebird_connection_tx_count',
+    help: 'Numero de transacoes ativas por esta conexao especifica',
+    labelNames: ['ip', 'process', 'user', 'id']
+});
+
+// 4. Detalhe das Queries
 const statementSeqReads = new client.Gauge({
     name: 'firebird_statement_seq_reads',
     help: 'Leituras sequenciais (Full Scan) da query atual - ALERTA DE LENTIDAO',
@@ -59,6 +66,7 @@ register.registerMetric(connectionsActive);
 register.registerMetric(transactionsActive);
 register.registerMetric(oldestTransaction);
 register.registerMetric(connectionDetail);
+register.registerMetric(connectionTxCount); // Registrar nova métrica
 register.registerMetric(statementSeqReads);
 register.registerMetric(statementIdxReads);
 
@@ -100,22 +108,41 @@ app.get('/metrics', async (req, res) => {
                 oldestTransaction.set(0);
             }
 
-            // C. Detalhes de Conexão (Reset antes de preencher)
+            // C. Detalhes de Conexão + Contagem de Transações por Conexão
             connectionDetail.reset();
+            connectionTxCount.reset();
+
+            // Query aprimorada: Traz os dados da conexão E conta quantas transações ela tem
             const sqlConnDetails = `
-                SELECT MON$ATTACHMENT_ID as ID, MON$REMOTE_ADDRESS as IP, MON$REMOTE_PROCESS as PROC, MON$USER as USR, MON$TIMESTAMP as TS
-                FROM MON$ATTACHMENTS WHERE MON$STATE = 1
+                SELECT
+                    A.MON$ATTACHMENT_ID as ID,
+                    A.MON$REMOTE_ADDRESS as IP,
+                    A.MON$REMOTE_PROCESS as PROC,
+                    A.MON$USER as USR,
+                    A.MON$TIMESTAMP as TS,
+                    (SELECT COUNT(*) FROM MON$TRANSACTIONS T WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_COUNT
+                FROM MON$ATTACHMENTS A
+                WHERE A.MON$STATE = 1
             `;
+
             const rowsConn = await query(db, sqlConnDetails);
+
             rowsConn.forEach(row => {
                 const connStart = new Date(row.TS);
                 const duration = (now - connStart) / 1000;
-                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').split('/')[0].trim() : 'Internal';                let cleanProc = row.PROC ? row.PROC.toString().trim() : 'Unknown';
+
+                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').split('/')[0].trim() : 'Internal';
+                let cleanProc = row.PROC ? row.PROC.toString().trim() : 'Unknown';
                 let cleanUser = row.USR ? row.USR.toString().trim() : 'Unknown';
+
+                // Métrica de Duração
                 connectionDetail.labels(cleanIp, cleanProc, cleanUser, row.ID).set(duration);
+
+                // Métrica de Transações Ativas (Novo)
+                connectionTxCount.labels(cleanIp, cleanProc, cleanUser, row.ID).set(row.TX_COUNT);
             });
 
-            // D. Queries Executando AGORA (Reset antes de preencher)
+            // D. Queries Executando AGORA
             statementSeqReads.reset();
             statementIdxReads.reset();
 
@@ -128,8 +155,8 @@ app.get('/metrics', async (req, res) => {
                     A.MON$REMOTE_ADDRESS as IP
                 FROM
                     MON$STATEMENTS S
-                    JOIN MON$RECORD_STATS R ON R.MON$STAT_ID = S.MON$STAT_ID
-                    JOIN MON$ATTACHMENTS A ON A.MON$ATTACHMENT_ID = S.MON$ATTACHMENT_ID
+                        JOIN MON$RECORD_STATS R ON R.MON$STAT_ID = S.MON$STAT_ID
+                        JOIN MON$ATTACHMENTS A ON A.MON$ATTACHMENT_ID = S.MON$ATTACHMENT_ID
                 WHERE
                     S.MON$STATE = 1
             `;
@@ -137,7 +164,8 @@ app.get('/metrics', async (req, res) => {
             const rowsStmt = await query(db, sqlStatements);
 
             rowsStmt.forEach(row => {
-                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').split('/')[0].trim() : 'Internal';                let cleanSql = row.SQL_TEXT ? row.SQL_TEXT.toString().trim().replace(/\s+/g, ' ') : 'Empty'; // Remove quebras de linha
+                let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').split('/')[0].trim() : 'Internal';
+                let cleanSql = row.SQL_TEXT ? row.SQL_TEXT.toString().trim().replace(/\s+/g, ' ') : 'Empty';
 
                 statementSeqReads.labels(cleanIp, cleanSql, row.ID).set(row.SEQ_READS);
                 statementIdxReads.labels(cleanIp, cleanSql, row.ID).set(row.IDX_READS);
@@ -156,5 +184,5 @@ app.get('/metrics', async (req, res) => {
 });
 
 app.listen(9399, () => {
-    console.log('Exporter Full rodando na porta 9399');
+    console.log('Exporter Full v2 rodando na porta 9399');
 });
