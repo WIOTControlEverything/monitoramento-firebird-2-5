@@ -75,6 +75,23 @@ services:
       - prometheus
     restart: always
 
+  # 4. Monitoramento MySQL
+  mysql-exporter:
+    image: prom/mysqld-exporter
+    container_name: mysqld_exporter
+    environment:
+      # SINTAXE: usuario:senha@(IP_DO_BANCO:3306)/
+      - DATA_SOURCE_NAME=root:sua_senha_aqui@(192.168.0.XX:3306)/
+      - TZ=America/Sao_Paulo
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 29104:9104
+    networks:
+      - wpanel
+    restart: always
+
 volumes:
   prometheus_data:
   grafana_data:

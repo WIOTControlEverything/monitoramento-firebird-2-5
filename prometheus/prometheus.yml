@@ -22,3 +22,8 @@ scrape_configs:
   - job_name: 'windows_server_vm_focco'
     static_configs:
       - targets: [ '192.168.0.101:9182' ]
+
+  # Job 5: Monitora o MySQL
+  - job_name: 'mysql_monitoring'
+    static_configs:
+      - targets: ['mysqld_exporter:9104']
