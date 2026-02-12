@@ -66,25 +66,40 @@ async function startBridge() {
 
 async function processBlock(pool, text) {
     try {
-        const dateMatch = text.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{4})/);
-        const txMatch = text.match(/\(transaction\s+(\d+)\)/i) || text.match(/Transaction\s+(\d+)/i);
+        // 1. DATA (Padrão: 2026-02-12 15:05:09)
+        const dateMatch = text.match(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+
+        // 2. TRANSAÇÃO (Padrão: TRA_8867979)
+        const txMatch = text.match(/TRA_(\d+)/);
+
+        // 3. DURAÇÃO (Padrão: 2995 ms)
         const durMatch = text.match(/(\d+)\s+ms/);
-        const sqlMatch = text.match(/(SELECT|INSERT|UPDATE|DELETE|EXECUTE|WITH)[\s\S]*/i);
-        const userMatch = text.match(/user\s+([^\s,]+)/i);
-        const ipMatch = text.match(/remote\s+([^\s,]+)/i);
+
+        // 4. SQL (Pega a partir de 'Statement ...' até o fim ou até estatísticas)
+        const sqlMatch = text.match(/Statement\s+\d+:[\s\S]*/i);
+
+        // 5. USUÁRIO e IP (Padrão: SYSDBA:NONE, NONE, TCPv4:192.168.0.173)
+        // Tentamos pegar o IP especificamente
+        const ipMatch = text.match(/TCPv4:([\d\.]+)/);
+        // Tentamos pegar o usuário antes dos dois pontos
+        const userMatch = text.match(/\(ATT_\d+,\s*([^:]+)/);
 
         if (durMatch && sqlMatch) {
             const dataEvento = dateMatch ? new Date(dateMatch[1]) : new Date();
             const transacaoId = txMatch ? txMatch[1] : 0;
             const duracao = parseInt(durMatch[1]);
-            const sql = sqlMatch[0].trim();
+            const sql = text; // Salva o texto COMPLETO (incluindo plano e stats) pois é rico em info
             const usuario = userMatch ? userMatch[1] : 'Unknown';
-            let ip = ipMatch ? ipMatch[1] : 'Unknown';
-            ip = ip.replace('IPv4:', '').split('/')[0];
+            const ip = ipMatch ? ipMatch[1] : 'Unknown';
 
-            const query = `INSERT INTO fb_slow_log (data_evento, transacao_id, duracao_ms, sql_text, usuario, ip_origem) VALUES (?, ?, ?, ?, ?, ?)`;
+            const query = `
+                INSERT INTO fb_slow_log 
+                (data_evento, transacao_id, duracao_ms, sql_text, usuario, ip_origem) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            `;
+
             await pool.execute(query, [dataEvento, transacaoId, duracao, sql, usuario, ip]);
-            console.log(`Log salvo: TX ${transacaoId} (${duracao}ms)`);
+            console.log(`Log salvo: TX ${transacaoId} (${duracao}ms) - IP ${ip}`);
         }
     } catch (e) {
         console.error("Erro processando bloco:", e.message);
