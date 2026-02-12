@@ -8,7 +8,12 @@ scrape_configs:
     static_configs:
       - targets: ['firebird_exporter:9399']
 
-  # Job 2: Monitora a VM (CPU/Memória/Disco) - NOVO
+  # Job 2: Monitora a VM (CPU/Memória/Disco)
   - job_name: 'firebird_vm'
     static_configs:
       - targets: ['192.168.0.75:9100']
+
+  # Job 3: Monitora a VM (CPU/Memória/Disco)
+  - job_name: 'wpanel_vm'
+    static_configs:
+      - targets: [ '192.168.0.17:9100' ]

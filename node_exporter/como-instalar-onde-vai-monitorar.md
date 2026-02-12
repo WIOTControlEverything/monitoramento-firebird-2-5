@@ -89,6 +89,22 @@ ExecStart=/usr/local/bin/node_exporter \
 WantedBy=multi-user.target
 ```
 
+## Obs.: caso não for usar a métrica do samba esse deve ser o arquivo
+```aiexclude
+[Unit]
+Description=Node Exporter
+After=network.target
+
+[Service]
+User=node_exporter
+Group=node_exporter
+Type=simple
+ExecStart=/usr/local/bin/node_exporter 
+
+[Install]
+WantedBy=multi-user.target
+```
+
 # Comandos para iniciar o serviço e habilitar
 ```aiexclude
 sudo systemctl daemon-reload
