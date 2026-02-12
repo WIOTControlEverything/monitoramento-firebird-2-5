@@ -81,7 +81,7 @@ services:
     container_name: mysqld_exporter
     environment:
       # SINTAXE: usuario:senha@(IP_DO_BANCO:3306)/
-      - DATA_SOURCE_NAME=root:sua_senha_aqui@(192.168.0.XX:3306)/
+      - DATA_SOURCE_NAME=root:At50lcdu@@mariadb:3306/
       - TZ=America/Sao_Paulo
     volumes:
       - /etc/timezone:/etc/timezone:ro
