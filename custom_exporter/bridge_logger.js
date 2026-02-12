@@ -15,7 +15,7 @@ const mysqlConfig = {
 
 // CONFIGURAÇÃO DO FIREBIRD
 const fbConfig = {
-    bin: 'fbtracemgr',
+    bin: '/usr/bin/fbtracemgr',
     service: '192.168.0.75:service_mgr',
     user: 'SYSDBA',
     password: 'masterkey',
