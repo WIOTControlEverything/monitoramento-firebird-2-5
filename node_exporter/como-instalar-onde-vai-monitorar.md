@@ -44,3 +44,13 @@ sudo systemctl daemon-reload
 sudo systemctl start node_exporter
 sudo systemctl enable node_exporter
 ```
+
+# Para importar uma dash em Português para apresentar os dados do node_exporter uso o id
+```aiexclude
+21180
+```
+
+# ou em inglês
+```aiexclude
+1860
+```
