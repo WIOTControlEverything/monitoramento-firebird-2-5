@@ -4,10 +4,14 @@ services:
     build: ./custom_exporter
     container_name: firebird_exporter
     environment:
+      - TZ=America/Sao_Paulo
       - DB_HOST=192.168.0.75
       - DB_PATH=/home/latitude/firebird/data/latitude.fdb
       - DB_USER=SYSDBA
       - DB_PASSWORD=masterkey
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
     ports:
       - 29399:9399
     networks:
