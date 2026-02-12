@@ -17,6 +17,22 @@ services:
     networks:
       - wpanel
     restart: always
+    command: node index.js
+
+  trace-logger:
+    build: ./custom_exporter  # Usa a mesma imagem do de cima
+    container_name: firebird_trace_logger
+    environment:
+      - TZ=America/Sao_Paulo
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - wpanel
+    restart: always
+    depends_on:
+      - sql-exporter
+    command: node bridge_logger.js
 
   # 2. O Banco de Dados de Séries Temporais (Guarda o histórico)
   prometheus:

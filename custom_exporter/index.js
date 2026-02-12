@@ -63,6 +63,12 @@ const connectionTxList = new client.Gauge({
     labelNames: ['ip', 'process', 'user', 'id', 'tx_ids']
 });
 
+const connectionSqlText = new client.Gauge({
+    name: 'firebird_connection_current_sql',
+    help: 'SQL que esta sendo executado por esta conexao no momento',
+    labelNames: ['ip', 'process', 'user', 'id', 'sql_text_short']
+});
+
 // 5. Detalhe das Queries
 const statementSeqReads = new client.Gauge({
     name: 'firebird_statement_seq_reads',
@@ -110,6 +116,7 @@ register.registerMetric(connectionDetail);
 register.registerMetric(connectionTxCount);
 register.registerMetric(connectionTxAge);
 register.registerMetric(connectionTxList);
+register.registerMetric(connectionSqlText);
 register.registerMetric(statementSeqReads);
 register.registerMetric(statementIdxReads);
 register.registerMetric(dbInfo);
