@@ -143,7 +143,13 @@ app.get('/metrics', async (req, res) => {
                 const duration = (now - connStart) / 1000;
 
                 let cleanIp = row.IP ? row.IP.toString().replace('IPv4:', '').split('/')[0].trim() : 'Internal';
-                let cleanProc = row.PROC ? row.PROC.toString().trim() : 'Unknown';
+                let rawProc = row.PROC ? row.PROC.toString().trim() : 'Unknown';
+                let cleanProc = rawProc;
+
+                // Regra: Se começar com "\\" (caminho de rede), pega tudo depois da última barra
+                if (rawProc.startsWith('\\\\')) {
+                    cleanProc = rawProc.split('\\').pop();
+                }
                 let cleanUser = row.USR ? row.USR.toString().trim() : 'Unknown';
 
                 // Métrica de Duração
