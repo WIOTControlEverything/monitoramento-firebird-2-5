@@ -8,6 +8,10 @@ RUN apt-get update && apt-get install -y \
     libfbclient2 \
     && rm -rf /var/lib/apt/lists/*
 
+# O Firebird procura a .so.0, mas o Debian instala a .so.1
+# Criamos um link simbólico para enganar o binário
+RUN ln -s /usr/lib/x86_64-linux-gnu/libtommath.so.1 /usr/lib/x86_64-linux-gnu/libtommath.so.0
+
 WORKDIR /tmp
 
 # 2. BAIXA O FIREBIRD 3.0 (Para rodar no Linux Novo, mas conecta no 2.5)
