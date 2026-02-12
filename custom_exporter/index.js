@@ -75,6 +75,29 @@ const statementIdxReads = new client.Gauge({
     labelNames: ['ip', 'sql_text', 'id']
 });
 
+// 6. Informações Estáticas do Banco (Versão, ODS, etc)
+const dbInfo = new client.Gauge({
+    name: 'firebird_database_info',
+    help: 'Informacoes estaticas de configuracao do banco',
+    labelNames: ['engine_version', 'ods_version', 'dialect', 'db_path']
+});
+
+// 7. Configurações Numéricas Importantes
+const dbPageSize = new client.Gauge({
+    name: 'firebird_db_page_size_bytes',
+    help: 'Tamanho da pagina do banco de dados'
+});
+
+const dbForcedWrites = new client.Gauge({
+    name: 'firebird_db_forced_writes',
+    help: 'Status do Forced Writes (1 = Ligado/Seguro, 0 = Desligado/Risco)'
+});
+
+const dbSweepInterval = new client.Gauge({
+    name: 'firebird_db_sweep_interval',
+    help: 'Intervalo de Sweep automatico configurado'
+});
+
 register.registerMetric(connectionsActive);
 register.registerMetric(transactionsActive);
 register.registerMetric(oldestTransaction);
@@ -84,6 +107,10 @@ register.registerMetric(connectionTxAge);
 register.registerMetric(connectionTxList);
 register.registerMetric(statementSeqReads);
 register.registerMetric(statementIdxReads);
+register.registerMetric(dbInfo);
+register.registerMetric(dbPageSize);
+register.registerMetric(dbForcedWrites);
+register.registerMetric(dbSweepInterval);
 
 // Função auxiliar de Query
 const query = (db, sql) => {
@@ -216,6 +243,43 @@ app.get('/metrics', async (req, res) => {
                 statementSeqReads.labels(cleanIp, cleanSql, row.ID).set(row.SEQ_READS);
                 statementIdxReads.labels(cleanIp, cleanSql, row.ID).set(row.IDX_READS);
             });
+
+            // E. Coleta de Informações do Banco (MON$DATABASE)
+            dbInfo.reset();
+            dbPageSize.reset();
+            dbForcedWrites.reset();
+            dbSweepInterval.reset();
+
+            const sqlInfo = `
+                SELECT 
+                    M.MON$DATABASE_NAME as DB_PATH,
+                    M.MON$PAGE_SIZE as PAGE_SIZE,
+                    M.MON$SQL_DIALECT as DIALECT,
+                    M.MON$ODS_MAJOR || '.' || M.MON$ODS_MINOR as ODS_VER,
+                    M.MON$FORCED_WRITES as FW,
+                    M.MON$SWEEP_INTERVAL as SWEEP,
+                    rdb$get_context('SYSTEM', 'ENGINE_VERSION') as ENGINE_VER
+                FROM MON$DATABASE M
+            `;
+
+            const resInfo = await query(db, sqlInfo);
+
+            if (resInfo.length > 0) {
+                const row = resInfo[0];
+
+                // Métrica de Texto (Info)
+                dbInfo.labels(
+                    row.ENGINE_VER,
+                    row.ODS_VER,
+                    row.DIALECT.toString(),
+                    row.DB_PATH
+                ).set(1);
+
+                // Métricas Numéricas
+                dbPageSize.set(row.PAGE_SIZE);
+                dbForcedWrites.set(row.FW);
+                dbSweepInterval.set(row.SWEEP);
+            }
 
             db.detach();
             res.set('Content-Type', register.contentType);
