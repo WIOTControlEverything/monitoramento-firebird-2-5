@@ -73,7 +73,8 @@ register.registerMetric(connectionsActive);
 register.registerMetric(transactionsActive);
 register.registerMetric(oldestTransaction);
 register.registerMetric(connectionDetail);
-register.registerMetric(connectionTxCount); // Registrar nova métrica
+register.registerMetric(connectionTxCount);
+register.registerMetric(connectionTxList);
 register.registerMetric(statementSeqReads);
 register.registerMetric(statementIdxReads);
 
