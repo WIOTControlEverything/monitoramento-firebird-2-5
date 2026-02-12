@@ -54,7 +54,7 @@ const connectionTxCount = new client.Gauge({
 const connectionTxList = new client.Gauge({
     name: 'firebird_connection_tx_ids_info',
     help: 'Métrica dummy usada apenas para levar a lista de IDs como label',
-    labelNames: ['id', 'tx_ids']
+    labelNames: ['ip', 'process', 'user', 'id', 'tx_ids']
 });
 
 // 5. Detalhe das Queries
@@ -156,7 +156,7 @@ app.get('/metrics', async (req, res) => {
                 let txListString = row.TX_LIST_STR ? row.TX_LIST_STR.toString() : '-';
 
                 // O valor é 1 (dummy), o que importa é a label tx_ids
-                connectionTxList.labels(row.ID, txListString).set(1);
+                connectionTxList.labels(cleanIp, cleanProc, cleanUser, row.ID, txListString).set(1);
             });
 
             // D. Queries Executando AGORA
