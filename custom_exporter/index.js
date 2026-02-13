@@ -30,10 +30,6 @@ const connectionTxCount = new client.Gauge({ name: 'firebird_connection_tx_count
 const connectionTxAge = new client.Gauge({ name: 'firebird_connection_tx_age_seconds', help: 'Idade transacao', labelNames: ['ip', 'process', 'user', 'id'] });
 const connectionTxList = new client.Gauge({ name: 'firebird_connection_tx_ids_info', help: 'Lista IDs', labelNames: ['ip', 'process', 'user', 'id', 'tx_ids'] });
 
-// MANTENHO ESSAS DUAS ZERADAS PARA NÃO QUEBRAR O GRAFANA SE ELE TIVER ESSAS VARIAVEIS
-const statementSeqReads = new client.Gauge({ name: 'firebird_statement_seq_reads', help: 'Desativado para estabilidade', labelNames: ['ip', 'sql_text', 'id'] });
-const statementIdxReads = new client.Gauge({ name: 'firebird_statement_idx_reads', help: 'Desativado para estabilidade', labelNames: ['ip', 'sql_text', 'id'] });
-
 const dbInfo = new client.Gauge({ name: 'firebird_database_info', help: 'Info Banco', labelNames: ['engine_version', 'ods_version', 'dialect', 'db_path'] });
 const dbPageSize = new client.Gauge({ name: 'firebird_db_page_size_bytes', help: 'Page Size' });
 const dbForcedWrites = new client.Gauge({ name: 'firebird_db_forced_writes', help: 'Forced Writes' });
@@ -47,8 +43,6 @@ register.registerMetric(connectionDetail);
 register.registerMetric(connectionTxCount);
 register.registerMetric(connectionTxAge);
 register.registerMetric(connectionTxList);
-register.registerMetric(statementSeqReads);
-register.registerMetric(statementIdxReads);
 register.registerMetric(dbInfo);
 register.registerMetric(dbPageSize);
 register.registerMetric(dbForcedWrites);
@@ -139,11 +133,6 @@ app.get('/metrics', async (req, res) => {
                 }
                 connectionTxList.labels(cleanIp, cleanProc, cleanUser, row.ID, txListString).set(1);
             });
-
-            // --- REMOVIDO PASSO 5 (MON$STATEMENTS) QUE CAUSAVA O TRAVAMENTO ---
-            // O Trace Logger já pega essas informações no MySQL.
-            statementSeqReads.reset();
-            statementIdxReads.reset();
 
             // 6. Info Banco (Leve e rápido)
             dbInfo.reset();
