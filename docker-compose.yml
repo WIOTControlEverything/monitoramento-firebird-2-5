@@ -72,8 +72,8 @@ services:
       - GF_SERVER_ROOT_URL=https://fsg-grafana.wpanel.ind.br/
       - GF_SERVER_SERVE_FROM_SUB_PATH=false
       - GF_SECURITY_ALLOW_EMBEDDING=true
-      - GF_SECURITY_COOKIE_SAMESITE=none
-      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=lax
+      - GF_SECURITY_COOKIE_SECURE=false
       - GF_SECURITY_CSRF_ADDITIONAL_HEADERS=X-Forwarded-Host
     depends_on:
       - prometheus
