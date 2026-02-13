@@ -189,7 +189,7 @@ app.get('/metrics', async (req, res) => {
                      WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_AGE_SEC,
 
                     -- Lista os IDs para auditoria
-                    (SELECT LIST(T.MON$TRANSACTION_ID, ', ')
+                    (SELECT CAST(LIST(T.MON$TRANSACTION_ID, ', ') AS VARCHAR(1000))
                      FROM MON$TRANSACTIONS T
                      WHERE T.MON$ATTACHMENT_ID = A.MON$ATTACHMENT_ID AND T.MON$STATE = 1) as TX_LIST_STR
                 FROM MON$ATTACHMENTS A
@@ -222,7 +222,20 @@ app.get('/metrics', async (req, res) => {
                 connectionTxAge.labels(cleanIp, cleanProc, cleanUser, row.ID).set(txAge);
 
                 // Se tiver transação, pega a lista. Se não, deixa vazio.
-                let txListString = row.TX_LIST_STR ? row.TX_LIST_STR.toString() : '-';
+                // Tratamento seguro de BLOB/Buffer/Function
+                let txListString = '-';
+                if (row.TX_LIST_STR) {
+                    if (typeof row.TX_LIST_STR === 'function') {
+                        // Se for função (BLOB stream), tenta converter ou ignora pra não travar
+                        // Geralmente em drivers antigos, BLOBs vêm assim.
+                        // Para simplificar e não travar, vamos pegar o buffer se possível ou placeholder
+                        txListString = 'BLOB_DATA';
+                    } else if (Buffer.isBuffer(row.TX_LIST_STR)) {
+                        txListString = row.TX_LIST_STR.toString('utf8');
+                    } else {
+                        txListString = row.TX_LIST_STR.toString();
+                    }
+                }
 
                 // O valor é 1 (dummy), o que importa é a label tx_ids
                 connectionTxList.labels(cleanIp, cleanProc, cleanUser, row.ID, txListString).set(1);
